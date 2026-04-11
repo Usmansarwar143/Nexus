@@ -27,7 +27,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Only connect if the user is authenticated
     if (!user) return;
 
-    const newSocket = io('http://localhost:5000', {
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const newSocket = io(socketUrl, {
       withCredentials: true,
     });
 
