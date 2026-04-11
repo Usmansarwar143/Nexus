@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MessageCircle, Users, Calendar, Building2, MapPin, UserCircle, FileText, DollarSign, Send } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
@@ -6,18 +6,64 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
-import { findUserById } from '../../data/users';
-import { createCollaborationRequest, getRequestsFromInvestor } from '../../data/collaborationRequests';
+import { getUserById, createCollaboration, getCollaborations } from '../../services/api';
 import { Entrepreneur } from '../../types';
+import { ScheduleMeetingModal } from '../../components/meeting/ScheduleMeetingModal';
+import toast from 'react-hot-toast';
 
 export const EntrepreneurProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
   
-  // Fetch entrepreneur data
-  const entrepreneur = findUserById(id || '') as Entrepreneur | null;
+  const [entrepreneur, setEntrepreneur] = useState<Entrepreneur | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasRequestedCollaboration, setHasRequestedCollaboration] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
-  if (!entrepreneur || entrepreneur.role !== 'entrepreneur') {
+  const isInvestor = currentUser?.role === 'investor';
+  const isCurrentUser = currentUser?.id === id || (currentUser as any)?._id === id;
+
+  React.useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        if (!id) return;
+        
+        // Fetch entrepreneur profile
+        const response = await getUserById(id);
+        const userData = response.data;
+        if (userData.role === 'entrepreneur') {
+          setEntrepreneur(userData);
+        }
+        
+        // If current user is an investor, check if they've already requested collaboration
+        if (isInvestor) {
+          const collabRes = await getCollaborations();
+          const hasRequested = collabRes.data.some((req: any) => 
+            (req.entrepreneurId === id || req.entrepreneurId?._id === id) &&
+            (req.investorId === currentUser?.id || req.investorId?._id === (currentUser as any)?._id)
+          );
+          setHasRequestedCollaboration(hasRequested);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProfileData();
+  }, [id, currentUser, isInvestor]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!entrepreneur) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-gray-900">Entrepreneur not found</h2>
@@ -29,25 +75,21 @@ export const EntrepreneurProfile: React.FC = () => {
     );
   }
   
-  const isCurrentUser = currentUser?.id === entrepreneur.id;
-  const isInvestor = currentUser?.role === 'investor';
-  
-  // Check if the current investor has already sent a request to this entrepreneur
-  const hasRequestedCollaboration = isInvestor && id 
-    ? getRequestsFromInvestor(currentUser.id).some(req => req.entrepreneurId === id)
-    : false;
-  
-  const handleSendRequest = () => {
+  const handleSendRequest = async () => {
     if (isInvestor && currentUser && id) {
-      createCollaborationRequest(
-        currentUser.id,
-        id,
-        `I'm interested in learning more about ${entrepreneur.startupName} and would like to explore potential investment opportunities.`
-      );
-      
-      // In a real app, we would refresh the data or update state
-      // For this demo, we'll force a page reload
-      window.location.reload();
+      setIsSubmitting(true);
+      try {
+        await createCollaboration(
+          id,
+          `I'm interested in learning more about ${entrepreneur.startupName} and would like to explore potential investment opportunities.`
+        );
+        toast.success('Collaboration request sent successfully!');
+        setHasRequestedCollaboration(true);
+      } catch (error) {
+        toast.error('Failed to send collaboration request');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
   
@@ -93,7 +135,7 @@ export const EntrepreneurProfile: React.FC = () => {
           <div className="mt-6 sm:mt-0 flex flex-col sm:flex-row gap-2 justify-center sm:justify-end">
             {!isCurrentUser && (
               <>
-                <Link to={`/chat/${entrepreneur.id}`}>
+                <Link to={`/chat/${entrepreneur.id || (entrepreneur as any)._id}`}>
                   <Button
                     variant="outline"
                     leftIcon={<MessageCircle size={18} />}
@@ -104,8 +146,19 @@ export const EntrepreneurProfile: React.FC = () => {
                 
                 {isInvestor && (
                   <Button
+                    variant="outline"
+                    leftIcon={<Calendar size={18} />}
+                    onClick={() => setIsScheduleModalOpen(true)}
+                  >
+                    Schedule
+                  </Button>
+                )}
+                
+                {isInvestor && (
+                  <Button
                     leftIcon={<Send size={18} />}
-                    disabled={hasRequestedCollaboration}
+                    disabled={hasRequestedCollaboration || isSubmitting}
+                    isLoading={isSubmitting}
                     onClick={handleSendRequest}
                   >
                     {hasRequestedCollaboration ? 'Request Sent' : 'Request Collaboration'}
@@ -333,6 +386,7 @@ export const EntrepreneurProfile: React.FC = () => {
                     <Button
                       className="mt-3 w-full"
                       onClick={handleSendRequest}
+                      isLoading={isSubmitting}
                     >
                       Request Collaboration
                     </Button>
@@ -350,6 +404,15 @@ export const EntrepreneurProfile: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {entrepreneur && (
+        <ScheduleMeetingModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          targetUserId={entrepreneur.id || (entrepreneur as any)._id}
+          targetUserRole="entrepreneur"
+        />
+      )}
     </div>
   );
 };

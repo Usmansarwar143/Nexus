@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { UserRole } from '../../types';
+import toast from 'react-hot-toast';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -13,7 +14,10 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuth();
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  
+  const { login, verify2FACode } = useAuth();
   const navigate = useNavigate();
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,9 +26,20 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      await login(email, password, role);
-      // Redirect based on user role
-      navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      if (requires2FA) {
+        await verify2FACode(email, otpCode);
+        navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      } else {
+        const result = await login(email, password, role);
+        if (result && result.requires2FA) {
+          setRequires2FA(true);
+          setIsLoading(false);
+          toast.success('Check console for mock OTP code');
+          return;
+        }
+        // Redirect based on user role
+        navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      }
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
@@ -71,7 +86,33 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
           
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          {requires2FA ? (
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <Input
+                label="Verification Code"
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                required
+                fullWidth
+                placeholder="6-digit OTP"
+                maxLength={6}
+              />
+              <Button type="submit" fullWidth isLoading={isLoading}>
+                Verify Code
+              </Button>
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => setRequires2FA(false)}
+                  className="text-sm font-medium text-primary-600 hover:text-primary-500"
+                >
+                  Back to login
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 I am a
@@ -202,6 +243,7 @@ export const LoginPage: React.FC = () => {
               </p>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

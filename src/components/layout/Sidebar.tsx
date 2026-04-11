@@ -35,7 +35,6 @@ export const Sidebar: React.FC = () => {
   
   if (!user) return null;
   
-  // Define sidebar items based on user role
   const entrepreneurItems = [
     { to: '/dashboard/entrepreneur', icon: <Home size={20} />, text: 'Dashboard' },
     { to: '/profile/entrepreneur/' + user.id, icon: <Building2 size={20} />, text: 'My Startup' },
@@ -43,6 +42,7 @@ export const Sidebar: React.FC = () => {
     { to: '/messages', icon: <MessageCircle size={20} />, text: 'Messages' },
     { to: '/notifications', icon: <Bell size={20} />, text: 'Notifications' },
     { to: '/documents', icon: <FileText size={20} />, text: 'Documents' },
+    { to: '/wallet', icon: <CircleDollarSign size={20} />, text: 'Wallet' },
   ];
   
   const investorItems = [
@@ -52,6 +52,7 @@ export const Sidebar: React.FC = () => {
     { to: '/messages', icon: <MessageCircle size={20} />, text: 'Messages' },
     { to: '/notifications', icon: <Bell size={20} />, text: 'Notifications' },
     { to: '/deals', icon: <FileText size={20} />, text: 'Deals' },
+    { to: '/wallet', icon: <CircleDollarSign size={20} />, text: 'Wallet' },
   ];
   
   const sidebarItems = user.role === 'entrepreneur' ? entrepreneurItems : investorItems;

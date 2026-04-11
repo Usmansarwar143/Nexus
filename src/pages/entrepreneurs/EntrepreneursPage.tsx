@@ -4,15 +4,34 @@ import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
-import { entrepreneurs } from '../../data/users';
+import { getUsers } from '../../services/api';
+import { Entrepreneur } from '../../types';
+import toast from 'react-hot-toast';
 
 export const EntrepreneursPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedFundingRange, setSelectedFundingRange] = useState<string[]>([]);
+  const [entrepreneurs, setEntrepreneurs] = useState<Entrepreneur[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Get unique industries and funding ranges
-  const allIndustries = Array.from(new Set(entrepreneurs.map(e => e.industry)));
+  // Fetch entrepreneurs from backend
+  React.useEffect(() => {
+    const fetchEntrepreneurs = async () => {
+      try {
+        const response = await getUsers('entrepreneur');
+        setEntrepreneurs(response.data);
+      } catch (error) {
+        toast.error('Failed to load startups');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchEntrepreneurs();
+  }, []);
+  
+  // Get unique industries from fetched data
+  const allIndustries = Array.from(new Set(entrepreneurs.map(e => e.industry).filter(Boolean)));
   const fundingRanges = ['< $500K', '$500K - $1M', '$1M - $5M', '> $5M'];
   
   // Filter entrepreneurs based on search and filters
@@ -152,12 +171,22 @@ export const EntrepreneursPage: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredEntrepreneurs.map(entrepreneur => (
-              <EntrepreneurCard
-                key={entrepreneur.id}
-                entrepreneur={entrepreneur}
-              />
-            ))}
+            {isLoading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+              </div>
+            ) : filteredEntrepreneurs.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500">
+                No startups found matching your criteria.
+              </div>
+            ) : (
+              filteredEntrepreneurs.map(entrepreneur => (
+                <EntrepreneurCard
+                  key={entrepreneur.id || (entrepreneur as any)._id}
+                  entrepreneur={entrepreneur}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>

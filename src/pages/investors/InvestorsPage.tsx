@@ -4,16 +4,35 @@ import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { InvestorCard } from '../../components/investor/InvestorCard';
-import { investors } from '../../data/users';
+import { getUsers } from '../../services/api';
+import { Investor } from '../../types';
+import toast from 'react-hot-toast';
 
 export const InvestorsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [investors, setInvestors] = useState<Investor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch investors from backend
+  React.useEffect(() => {
+    const fetchInvestors = async () => {
+      try {
+        const response = await getUsers('investor');
+        setInvestors(response.data);
+      } catch (error) {
+        toast.error('Failed to load investors');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInvestors();
+  }, []);
   
   // Get unique investment stages and interests
-  const allStages = Array.from(new Set(investors.flatMap(i => i.investmentStage)));
-  const allInterests = Array.from(new Set(investors.flatMap(i => i.investmentInterests)));
+  const allStages = Array.from(new Set(investors.flatMap(i => i.investmentStage || [])));
+  const allInterests = Array.from(new Set(investors.flatMap(i => i.investmentInterests || [])));
   
   // Filter investors based on search and filters
   const filteredInvestors = investors.filter(investor => {
@@ -140,12 +159,22 @@ export const InvestorsPage: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredInvestors.map(investor => (
-              <InvestorCard
-                key={investor.id}
-                investor={investor}
-              />
-            ))}
+            {isLoading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+              </div>
+            ) : filteredInvestors.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500">
+                No investors found matching your criteria.
+              </div>
+            ) : (
+              filteredInvestors.map(investor => (
+                <InvestorCard
+                  key={investor.id || (investor as any)._id}
+                  investor={investor}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>

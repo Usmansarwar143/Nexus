@@ -7,8 +7,25 @@ export interface User {
   role: UserRole;
   avatarUrl: string;
   bio: string;
+  location?: string;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
   createdAt: string;
+}
+
+export interface Meeting {
+  _id?: string;
+  id?: string;
+  title: string;
+  entrepreneurId: any;
+  investorId: any;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  meetingLink?: string;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface Entrepreneur extends User {
@@ -70,11 +87,13 @@ export interface Document {
 
 export interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: UserRole) => Promise<void>;
+  login: (email: string, password: string, role: UserRole) => Promise<{ requires2FA: boolean; email?: string } | void>;
+  verify2FACode: (email: string, code: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   updateProfile: (userId: string, updates: Partial<User>) => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;

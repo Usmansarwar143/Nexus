@@ -1,21 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, PieChart, Filter, Search, PlusCircle } from 'lucide-react';
+import { Users, PieChart, Filter, Search, PlusCircle, Calendar, Video } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
-import { Entrepreneur } from '../../types';
+import { Entrepreneur, Meeting } from '../../types';
 import { entrepreneurs } from '../../data/users';
 import { getRequestsFromInvestor } from '../../data/collaborationRequests';
+import { getMeetings, updateMeetingStatus } from '../../services/api';
+
+import { MeetingCalendar } from '../../components/meeting/MeetingCalendar';
 
 export const InvestorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   
+  useEffect(() => {
+    if (user) {
+      const loadMeetings = async () => {
+        try {
+          const res = await getMeetings();
+          setMeetings(res.data);
+        } catch (e) {
+          console.error('Failed to load meetings', e);
+        }
+      };
+      loadMeetings();
+    }
+  }, [user]);
+
   if (!user) return null;
   
   // Get collaboration requests sent by this investor
@@ -147,8 +165,66 @@ export const InvestorDashboard: React.FC = () => {
         </Card>
       </div>
       
+      {/* Meetings Section */}
+      <div className="mt-6 space-y-6">
+        <Card className="z-0">
+          <CardHeader>
+            <h2 className="text-lg font-medium text-gray-900">Schedule</h2>
+          </CardHeader>
+          <CardBody className="p-2 sm:p-4">
+            <MeetingCalendar meetings={meetings} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings Details</h2>
+          </CardHeader>
+          <CardBody>
+            {meetings.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {meetings.map(meeting => (
+                  <div key={meeting._id} className="border p-4 rounded-lg bg-white shadow-sm flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-medium truncate">{meeting.title}</h4>
+                      <Badge variant={meeting.status === 'pending' ? 'secondary' : meeting.status === 'accepted' ? 'success' : 'gray'}>
+                        {meeting.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 truncate">With {meeting.entrepreneurId?.name}</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Calendar size={14} />
+                      <span>{new Date(meeting.date).toDateString()} at {meeting.startTime}</span>
+                    </div>
+                    {meeting.status === 'accepted' && (
+                      <Link to={`/call/${meeting._id}`} className="text-primary-600 text-sm mt-2 font-medium hover:underline inline-flex items-center gap-1">
+                        <Video size={14} /> Join Video Call
+                      </Link>
+                    )}
+                    {meeting.status === 'pending' && (
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          await updateMeetingStatus(meeting._id!, 'accepted');
+                          setMeetings(prev => prev.map(m => m._id === meeting._id ? { ...m, status: 'accepted'} : m));
+                        }}>Accept</Button>
+                        <Button size="sm" variant="secondary" onClick={async () => {
+                          await updateMeetingStatus(meeting._id!, 'rejected');
+                          setMeetings(prev => prev.map(m => m._id === meeting._id ? { ...m, status: 'rejected'} : m));
+                        }}>Reject</Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No scheduled meetings.</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
       {/* Entrepreneurs grid */}
-      <div>
+      <div className="mt-6">
         <Card>
           <CardHeader>
             <h2 className="text-lg font-medium text-gray-900">Featured Startups</h2>

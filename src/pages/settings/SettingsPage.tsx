@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Lock, Bell, Globe, Palette, CreditCard } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -6,11 +6,66 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar } from '../../components/ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
+import { enable2FA } from '../../services/api';
+import toast from 'react-hot-toast';
 
 export const SettingsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateProfile, changePassword } = useAuth();
+  
+  // Profile state
+  const [name, setName] = useState(user?.name || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [location, setLocation] = useState(user?.location || 'San Francisco, CA');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  
+  // 2FA state
+  const [isEnabling2FA, setIsEnabling2FA] = useState(false);
   
   if (!user) return null;
+
+  const handleUpdateProfile = async () => {
+    if (!user.id && !(user as any)._id) return;
+    setIsUpdatingProfile(true);
+    try {
+      await updateProfile(user.id || (user as any)._id, { name, bio, location });
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      return toast.error("New passwords don't match");
+    }
+    
+    setIsUpdatingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+  
+  const handleEnable2FA = async () => {
+    setIsEnabling2FA(true);
+    try {
+      const response = await enable2FA();
+      toast.success(response.data.message);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to enable 2FA');
+    } finally {
+      setIsEnabling2FA(false);
+    }
+  };
   
   return (
     <div className="space-y-6 animate-fade-in">
@@ -85,13 +140,14 @@ export const SettingsPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Full Name"
-                  defaultValue={user.name}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
                 
                 <Input
                   label="Email"
-                  type="email"
-                  defaultValue={user.email}
+                  value={user.email}
+                  disabled
                 />
                 
                 <Input
@@ -102,7 +158,8 @@ export const SettingsPage: React.FC = () => {
                 
                 <Input
                   label="Location"
-                  defaultValue="San Francisco, CA"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
                 />
               </div>
               
@@ -113,13 +170,23 @@ export const SettingsPage: React.FC = () => {
                 <textarea
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   rows={4}
-                  defaultValue={user.bio}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
                 ></textarea>
               </div>
               
               <div className="flex justify-end gap-3">
-                <Button variant="outline">Cancel</Button>
-                <Button>Save Changes</Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setName(user.name || '');
+                    setBio(user.bio || '');
+                    setLocation(user.location || 'San Francisco, CA');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateProfile} isLoading={isUpdatingProfile}>Save Changes</Button>
               </div>
             </CardBody>
           </Card>
@@ -137,9 +204,18 @@ export const SettingsPage: React.FC = () => {
                     <p className="text-sm text-gray-600">
                       Add an extra layer of security to your account
                     </p>
-                    <Badge variant="error" className="mt-1">Not Enabled</Badge>
+                    <Badge variant={user.twoFactorEnabled ? "success" : "error"} className="mt-1">
+                      {user.twoFactorEnabled ? "Enabled" : "Not Enabled"}
+                    </Badge>
                   </div>
-                  <Button variant="outline">Enable</Button>
+                  <Button 
+                    variant="outline"
+                    onClick={handleEnable2FA}
+                    isLoading={isEnabling2FA}
+                    disabled={user.twoFactorEnabled}
+                  >
+                    {user.twoFactorEnabled ? "Enabled" : "Enable"}
+                  </Button>
                 </div>
               </div>
               
@@ -149,20 +225,26 @@ export const SettingsPage: React.FC = () => {
                   <Input
                     label="Current Password"
                     type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
                   />
                   
                   <Input
                     label="New Password"
                     type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                   />
                   
                   <Input
                     label="Confirm New Password"
                     type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                   
                   <div className="flex justify-end">
-                    <Button>Update Password</Button>
+                    <Button onClick={handleUpdatePassword} isLoading={isUpdatingPassword}>Update Password</Button>
                   </div>
                 </div>
               </div>

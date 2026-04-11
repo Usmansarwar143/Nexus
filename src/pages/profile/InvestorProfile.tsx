@@ -1,22 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MessageCircle, Building2, MapPin, UserCircle, BarChart3, Briefcase } from 'lucide-react';
+import { MessageCircle, Building2, MapPin, UserCircle, BarChart3, Briefcase, Calendar } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
-import { findUserById } from '../../data/users';
+import { getUserById } from '../../services/api';
+import { ScheduleMeetingModal } from '../../components/meeting/ScheduleMeetingModal';
 import { Investor } from '../../types';
+import toast from 'react-hot-toast';
 
 export const InvestorProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
   
-  // Fetch investor data
-  const investor = findUserById(id || '') as Investor | null;
-  
-  if (!investor || investor.role !== 'investor') {
+  const [investor, setInvestor] = useState<Investor | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  const isCurrentUser = currentUser?.id === id || (currentUser as any)?._id === id;
+
+  React.useEffect(() => {
+    const fetchProfileParams = async () => {
+      try {
+        if (!id) return;
+        const response = await getUserById(id);
+        const userData = response.data;
+        if (userData.role === 'investor') {
+          setInvestor(userData);
+        }
+      } catch (error) {
+        toast.error('Failed to load investor profile');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProfileParams();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!investor) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-gray-900">Investor not found</h2>
@@ -27,8 +58,6 @@ export const InvestorProfile: React.FC = () => {
       </div>
     );
   }
-  
-  const isCurrentUser = currentUser?.id === investor.id;
   
   return (
     <div className="space-y-6 animate-fade-in">
@@ -65,13 +94,22 @@ export const InvestorProfile: React.FC = () => {
           
           <div className="mt-6 sm:mt-0 flex flex-col sm:flex-row gap-2 justify-center sm:justify-end">
             {!isCurrentUser && (
-              <Link to={`/chat/${investor.id}`}>
+              <>
+                <Link to={`/chat/${investor.id || (investor as any)._id}`}>
+                  <Button
+                    leftIcon={<MessageCircle size={18} />}
+                  >
+                    Message
+                  </Button>
+                </Link>
                 <Button
-                  leftIcon={<MessageCircle size={18} />}
+                  variant="outline"
+                  leftIcon={<Calendar size={18} />}
+                  onClick={() => setIsScheduleModalOpen(true)}
                 >
-                  Message
+                  Schedule
                 </Button>
-              </Link>
+              </>
             )}
             
             {isCurrentUser && (
@@ -267,6 +305,15 @@ export const InvestorProfile: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {investor && (
+        <ScheduleMeetingModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          targetUserId={investor.id || (investor as any)._id}
+          targetUserRole="investor"
+        />
+      )}
     </div>
   );
 };
