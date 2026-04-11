@@ -112,6 +112,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </form>
           ) : (
+            <>
             <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -243,6 +244,7 @@ export const LoginPage: React.FC = () => {
               </p>
             </div>
           </div>
+          </>
           )}
         </div>
       </div>
