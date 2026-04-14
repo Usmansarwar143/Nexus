@@ -1,0 +1,16 @@
+@echo off
+echo Starting Business Nexus Platform...
+
+echo Starting Backend Server...
+start cmd /k "cd server && npm run dev"
+
+echo Starting Frontend Server...
+start cmd /k "npm run dev"
+
+echo Waiting for servers to start...
+timeout /t 5 /nobreak > NUL
+
+echo Opening in browser...
+start http://localhost:5173
+
+echo Done! Feel free to close this window.
